@@ -14,6 +14,9 @@ def handle_data(client):
     try:    
         while True:
             prompt = input("$ ")
+            if prompt == "lock":
+                lock_screen(client)
+                continue
             if len(prompt.strip()) == 0:
                 continue
             client.send(prompt.encode())
@@ -25,6 +28,11 @@ def handle_data(client):
     except KeyboardInterrupt:
         print('Server closed')
     client.close()
+
+
+def lock_screen(client):
+    """ Lock remote machine screen """
+    client.send('xdg-screensaver lock'.encode())
 
 
 def get_args():
