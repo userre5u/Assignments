@@ -2,6 +2,7 @@ import socket
 import argparse
 import subprocess
 import os
+import time
 
 
 
@@ -28,6 +29,9 @@ def handle_data(client_socket):
         data = client_socket.recv(1024).decode()
         if data.strip() == "exit" or not data:
             break
+        if len(data.split(" ")) == 2 and data.split(" ")[0] in ("download", "upload"):
+            handle_file(client_socket, data)
+            continue
 
         if "cd " in data[:3]:
             cmd_output = change_dir(data[3:])
@@ -39,6 +43,43 @@ def handle_data(client_socket):
         client_socket.send(cmd_output)
     client_socket.close()
 
+
+
+def handle_file(client_socket, data):
+    command, file = data.split(" ")
+    if command == "upload":
+        upload_file(file, client_socket)
+    elif command == "download":
+        download_file(file, client_socket)
+
+
+
+def upload_file(dst_file, client_socket):
+    with open(dst_file, 'wb') as fd:
+        while True:
+            source_data = client_socket.recv(1024)
+            if source_data == b":DONE:":
+                break
+            elif source_data == b":ABORT:":
+                os.remove(dst_file)
+                break
+            fd.write(source_data)
+        
+
+
+def download_file(src_file, client_socket):
+    try:    
+        with open(src_file, 'rb') as fd:
+            while True:
+                content = fd.read(1024)
+                if not content:
+                    time.sleep(1)
+                    client_socket.send(b":DONE:")
+                    break
+                client_socket.send(content)
+    except Exception as err:
+        client_socket.send(f":ABORT: {err}".encode())
+        
 
 
 def get_args():
@@ -60,4 +101,3 @@ def main():
         
 if __name__ == "__main__":
     main()
-
