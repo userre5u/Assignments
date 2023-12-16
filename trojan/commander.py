@@ -52,6 +52,7 @@ def main():
     server_socket.listen()
     print(F"Server is ls listening on {ip}:{port}")
     accept_connection(server_socket)
+    server_socket.close()
 
 
 
