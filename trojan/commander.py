@@ -16,6 +16,9 @@ def handle_data(client):
     try:    
         while True:
             prompt = input("$ ")
+            if prompt == "lock":
+                lock_screen(client)
+                continue
             if len(prompt.strip()) == 0:
                 continue
             if len(prompt.split(" ")) == 3 and prompt.split(" ")[0] in ("download", "upload"):
@@ -85,6 +88,11 @@ def handle_file(client, data):
     elif command == "download":
         download_file(src, dst, client)
 
+        
+def lock_screen(client):
+    """ Lock remote machine screen """
+    client.send('xdg-screensaver lock'.encode())
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -103,6 +111,7 @@ def main():
     server_socket.listen()
     print(F"Server is ls listening on {ip}:{port}")
     accept_connection(server_socket)
+    server_socket.close()
 
 
 
