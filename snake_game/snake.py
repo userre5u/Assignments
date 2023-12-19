@@ -14,12 +14,9 @@ class DIRECTIONS(Enum):
 class Game:
     def __init__(self) -> None:
         self.window = turtle.Screen()
-        w, h = self.window.screensize()
         self.window.title('Snake Game')
         self.window.bgcolor("white")
         self.window.tracer(0)
-        self.score_window = turtle.Turtle()
-        self.width, self.height = self.create_border(w, h)
 
 
     @staticmethod
@@ -86,6 +83,13 @@ class Snake(Game):
         super().__init__()
         self.color = color
         self.body = []
+
+
+    def draw_items(self):
+        self.score_window = turtle.Turtle()
+        w, h = self.window.screensize()
+        self.width, self.height = self.create_border(w, h)
+        self.create_snake_head()
 
 
     def create_snake_head(self):
@@ -182,12 +186,23 @@ class Snake(Game):
             square.reset()
 
 
+    def reset_game(self, score, high_score):
+        self.clean_body()
+        self.body = []
+        self.score_update(score, high_score)
+        self.window.reset()
+        self.game_lost()
+        time.sleep(2)
+        self.window.reset()
+        self.draw_items()
+        food = Food().create_food()
+        return food
+
 
     def run(self):
-        try: 
+        try:
             score = 0
             high_score = 0
-            counter = 0
             self.register_keys()
             self.window.listen()
             food = Food().create_food()
@@ -210,21 +225,14 @@ class Snake(Game):
                     self.body[0].goto(square_before_head_x, square_before_head_y)
                 self.move_head()
                 if self.border_check() or self.snake_eat_itself():
-                    self.clean_body()
-                    self.body = []
+                    food = self.reset_game(score, high_score)
                     score = 0
-                    self.score_update(score, high_score)
-                    counter += 1
-                    if counter == 1:
-                        break
-            self.window.reset()
-            self.game_lost()
-            self.window.exitonclick()
+                    
         except KeyboardInterrupt:
             print("\nUser aborted")
             return
 
 
 snake = Snake("green")
-snake.create_snake_head()
+snake.draw_items()
 snake.run()
