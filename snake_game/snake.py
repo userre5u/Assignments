@@ -14,19 +14,40 @@ class DIRECTIONS(Enum):
 class Game:
     def __init__(self) -> None:
         self.window = turtle.Screen()
+        w, h = self.window.screensize()
         self.window.title('Snake Game')
-        self.window.bgcolor("black")
+        self.window.bgcolor("white")
         self.window.tracer(0)
         self.score_window = turtle.Turtle()
+        self.width, self.height = self.create_border(w, h)
 
-   
 
     @staticmethod
-    def game_lost():
+    def create_border(w, h):
+        turtle_g = turtle.Turtle(visible=False)
+        new_w, new_h = w+60, h+30
+        offset = 5
+        turtle_g.color("red", "black")
+        turtle_g.goto(-new_w-offset, new_h+offset)
+        turtle_g.begin_fill()
+        turtle_g.forward(new_w*2)  
+        turtle_g.right(90)
+        turtle_g.forward(new_h*2)  
+        turtle_g.right(90)
+        turtle_g.forward(new_w*2)
+        turtle_g.right(90)
+        turtle_g.forward(new_h*2)
+        turtle_g.right(90)
+        turtle_g.end_fill()
+        turtle_g.hideturtle()
+        return new_w, new_h
+   
+
+    def game_lost(self):
         score_window = turtle.Turtle(visible=False)
         score_window.speed(0)
         score_window.shape("square")
-        score_window.color("white")
+        score_window.color("black")
         score_window.penup()
         score_window.hideturtle()
         score_window.goto(0, 0)
@@ -40,7 +61,7 @@ class Game:
         self.score_window.color("white")
         self.score_window.penup()
         self.score_window.hideturtle()
-        self.score_window.goto(-380, 280)
+        self.score_window.goto((-self.width)+20, self.height-20)
         self.score_window.clear()
         self.score_window.write(F"Score: {score} \t\t\t\t\tHigh Score: {high_score}", align="left", font=("Arial", 16, "normal"))
 
@@ -80,7 +101,7 @@ class Snake(Game):
         single_square = turtle.Turtle()
         single_square.speed = 0
         single_square.shape(name="square")
-        single_square.color("grey")
+        single_square.color("blue")
         single_square.penup()
         self.body.append(single_square)
     
@@ -141,7 +162,7 @@ class Snake(Game):
     
 
     def border_check(self):
-        if self.head.xcor() > 400 or self.head.ycor() > 300 or self.head.xcor() < -400 or self.head.ycor() < -300:
+        if self.head.xcor() > self.width or self.head.ycor() > self.height or self.head.xcor() < -self.width or self.head.ycor() < -self.height:
             time.sleep(1)
             self.head.goto(0, 0)
             return True
@@ -163,41 +184,45 @@ class Snake(Game):
 
 
     def run(self):
-        score = 0
-        high_score = 0
-        counter = 0
-        self.register_keys()
-        self.window.listen()
-        food = Food().create_food()
-        while True:    
-            self.window.update()
-            time.sleep(0.1)
-            if self.head.distance(food) < 15:
-                random_x = random.randint(-290, 290)
-                random_y = random.randint(-290, 290)
-                self.create_snake_body()
-                score += 10
-                if score > high_score:
-                    high_score = score
-                self.score_update(score, high_score)
-                food.goto(random_x, random_y)
-            self.move_body()
-            if len(self.body) > 0:   
-                square_before_head_x = self.head.xcor()
-                square_before_head_y = self.head.ycor()
-                self.body[0].goto(square_before_head_x, square_before_head_y)
-            self.move_head()
-            if self.border_check() or self.snake_eat_itself():
-                self.clean_body()
-                self.body = []
-                score = 0
-                self.score_update(score, high_score)
-                counter += 1
-                if counter == 3:
-                    break
-        self.window.reset()
-        self.game_lost()
-        self.window.exitonclick()
+        try: 
+            score = 0
+            high_score = 0
+            counter = 0
+            self.register_keys()
+            self.window.listen()
+            food = Food().create_food()
+            while True:    
+                self.window.update()
+                time.sleep(0.1)
+                if self.head.distance(food) < 15:
+                    random_x = random.randint(-(self.width-100), self.height-100)
+                    random_y = random.randint(-(self.width-100), self.height-100)
+                    self.create_snake_body()
+                    score += 10
+                    if score > high_score:
+                        high_score = score
+                    self.score_update(score, high_score)
+                    food.goto(random_x, random_y)
+                self.move_body()
+                if len(self.body) > 0:   
+                    square_before_head_x = self.head.xcor()
+                    square_before_head_y = self.head.ycor()
+                    self.body[0].goto(square_before_head_x, square_before_head_y)
+                self.move_head()
+                if self.border_check() or self.snake_eat_itself():
+                    self.clean_body()
+                    self.body = []
+                    score = 0
+                    self.score_update(score, high_score)
+                    counter += 1
+                    if counter == 1:
+                        break
+            self.window.reset()
+            self.game_lost()
+            self.window.exitonclick()
+        except KeyboardInterrupt:
+            print("\nUser aborted")
+            return
 
 
 snake = Snake("green")
