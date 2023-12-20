@@ -210,8 +210,9 @@ class Snake(Game):
                 self.window.update()
                 time.sleep(0.1)
                 if self.head.distance(food) < 15:
-                    random_x = random.randint(-(self.width-100), self.height-100)
-                    random_y = random.randint(-(self.width-100), self.height-100)
+                    random_x = random.randint(-(self.width-100), self.width-100)
+                    random_y = random.randint(-(self.height-100), self.height-100)
+                    print(random_x, random_y)
                     self.create_snake_body()
                     score += 10
                     if score > high_score:
@@ -233,6 +234,14 @@ class Snake(Game):
             return
 
 
-snake = Snake("green")
-snake.draw_items()
-snake.run()
+def main():
+    snake = Snake("green")
+    snake.draw_items()
+    snake.run()
+
+
+if __name__ == "__main__":
+    main()
+
+
+
