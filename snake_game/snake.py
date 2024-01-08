@@ -20,6 +20,24 @@ class Game:
 
 
     @staticmethod
+    def create_visual_object(turtle_visible=True, speed=0, color="black", shape="square", start_coordinates=(0, 0), penup=False, hideturtle=False, shape_size=None, format_msg=None):
+        visual_obj = turtle.Turtle(visible=turtle_visible)
+        visual_obj.speed(speed)
+        visual_obj.shape(name=shape)
+        visual_obj.color(color)
+        if penup:
+            visual_obj.penup()
+        if hideturtle:    
+            visual_obj.hideturtle()
+        if shape_size:
+            visual_obj.shapesize(shape_size[0], shape_size[1])
+        visual_obj.goto(start_coordinates[0], start_coordinates[1])
+        if format_msg:
+            visual_obj.write(format_msg["msg"], align=format_msg["align"], font=format_msg["font"])
+        return visual_obj
+
+    
+    @staticmethod
     def create_border(w, h):
         turtle_g = turtle.Turtle(visible=False)
         new_w, new_h = w+60, h+30
@@ -41,15 +59,11 @@ class Game:
    
 
     def game_lost(self):
-        score_window = turtle.Turtle(visible=False)
-        score_window.speed(0)
-        score_window.shape("square")
-        score_window.color("black")
-        score_window.penup()
-        score_window.hideturtle()
-        score_window.goto(0, 0)
-        score_window.write(F"You Lost :(", align="center", font=("Arial", 36, "normal"))
+        self.create_visual_object(turtle_visible=False, penup=True, hideturtle=True, format_msg={"msg": "You Lost :(", "align": "center", "font": ("Arial", 36, "normal")})
 
+
+    def create_food(self):
+        return self.create_visual_object(shape="circle", color="red", penup=True, shape_size=(0.50, 0.50))
     
 
     def score_update(self, score, high_score):
@@ -61,20 +75,6 @@ class Game:
         self.score_window.goto((-self.width)+20, self.height-20)
         self.score_window.clear()
         self.score_window.write(F"Score: {score} \t\t\t\t\tHigh Score: {high_score}", align="left", font=("Arial", 16, "normal"))
-
-
-
-class Food:
-    @staticmethod
-    def create_food():
-        food = turtle.Turtle()
-        food.speed(0)
-        food.shape(name="circle")
-        food.color("red")
-        food.penup()
-        food.shapesize(0.50, 0.50)
-        food.goto(0, 0)
-        return food
 
 
 
@@ -93,20 +93,11 @@ class Snake(Game):
 
 
     def create_snake_head(self):
-        self.head = turtle.Turtle()
-        self.head.speed = 0
-        self.head.shape(name="triangle")
-        self.head.color(self.color)
-        self.head.penup()
-        self.head.goto(0, 100)
+        self.head = self.create_visual_object(shape="triangle", color=self.color, penup=True, start_coordinates=(0, 100))
     
 
     def create_snake_body(self):
-        single_square = turtle.Turtle()
-        single_square.speed = 0
-        single_square.shape(name="square")
-        single_square.color("blue")
-        single_square.penup()
+        single_square = self.create_visual_object(color="blue", penup=True)
         self.body.append(single_square)
     
 
@@ -195,8 +186,6 @@ class Snake(Game):
         time.sleep(2)
         self.window.reset()
         self.draw_items()
-        food = Food().create_food()
-        return food
 
 
     def run(self):
@@ -205,14 +194,13 @@ class Snake(Game):
             high_score = 0
             self.register_keys()
             self.window.listen()
-            food = Food().create_food()
+            food = self.create_food()
             while True:    
                 self.window.update()
                 time.sleep(0.1)
                 if self.head.distance(food) < 15:
                     random_x = random.randint(-(self.width-100), self.width-100)
                     random_y = random.randint(-(self.height-100), self.height-100)
-                    print(random_x, random_y)
                     self.create_snake_body()
                     score += 10
                     if score > high_score:
@@ -226,7 +214,8 @@ class Snake(Game):
                     self.body[0].goto(square_before_head_x, square_before_head_y)
                 self.move_head()
                 if self.border_check() or self.snake_eat_itself():
-                    food = self.reset_game(score, high_score)
+                    self.reset_game(score, high_score)
+                    food = self.create_food()
                     score = 0
                     
         except KeyboardInterrupt:
@@ -242,6 +231,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
